@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <title>Lexical Decision Task</title>
+    <script src="https://unpkg.com/jspsych@7.3.4"></script>
+    <script src="https://unpkg.com/@jspsych/plugin-html-keyboard-response@1.1.3"></script>
+    <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css" />
+    <style>
+      .stimulus-text {
+        font-size: 48px;
+        font-family: Arial, sans-serif;
+      }
+      .mask-text {
+        font-size: 48px;
+        font-family: monospace;
+        letter-spacing: 5px;
+      }
+    </style>
+  </head>
+  <body></body>
+  <script>
+    // 1. Initialize jsPsych
+    const jsPsych = initJsPsych({
+        on_finish: function() {
+            // 1. Get the data in CSV format
+            const experiment_data = jsPsych.data.get().csv();
+
+            // 2. Use fetch to send the data to your PHP script
+            fetch("save_data.php", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+                file_name: "lexical_decision_results.csv", // The name of the file to save/append to
+                exp_data: experiment_data
+            }),
+            })
+            .then((response) => response.text())
+            .then((text) => {
+            console.log("Server response:", text);
+            // Optional: Add a message to the screen for the participant
+            document.body.innerHTML = '<h2>Data saved. You may now close this window.</h2>';
+            })
+            .catch((error) => {
+            console.error("Error saving data:", error);
+            });
+        }
+    });
+
+    const timeline = [];
+
+    // 2. Welcome & Instructions
+    const instructions = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: `
+        <h2>Welcome to the experiment!</h2>
+        <p>In this task, you will see a fixation cross (+), followed by flashes on the screen.</p>
+        <p>After the flashes, a target word will appear in <strong>UPPERCASE</strong> letters.</p>
+        <br>
+        <p>Press the <strong>'F'</strong> key if the target is a real <strong>WORD</strong>.</p>
+        <p>Press the <strong>'J'</strong> key if the target is a <strong>NON-WORD</strong>.</p>
+        <br>
+        <p>Press any key to begin.</p>
+      `
+    };
+    timeline.push(instructions);
+
+    // 3. Helper function for random number mask
+    function generateMask() {
+      let mask = "";
+      for (let i = 0; i < 8; i++) {
+        mask += Math.floor(Math.random() * 10); 
+      }
+      return `<div class="mask-text">${mask}</div>`;
+    }
+
+    // 4. Trial Structure definition
+    
+    // Part A: Fixation Cross (500ms)
+    const fixation_trial = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: '<div class="stimulus-text">+</div>',
+      choices: "NO_KEYS",
+      trial_duration: 1000
+    };
+
+    // Part B: Forward Mask (500ms)
+    const mask_trial = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: generateMask, 
+      choices: "NO_KEYS",     
+      trial_duration: 500
+    };
+
+    // Part C: Prime (50ms)
+    const prime_trial = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function() {
+        return `<div class="stimulus-text">${jsPsych.timelineVariable('prime')}</div>`;
+      },
+      choices: "NO_KEYS",
+      trial_duration: 50
+    };
+
+    // Part D: Target (Stays up until response, includes post-trial gap)
+    const target_trial = {
+      type: jsPsychHtmlKeyboardResponse,
+      stimulus: function() {
+        return `<div class="stimulus-text"><strong>${jsPsych.timelineVariable('target')}</strong></div>`;
+      },
+      choices: ['f', 'j'], 
+      post_trial_gap: 1000, // 1000ms blank screen after response before the next trial starts
+      data: {
+        task: 'response',
+        correct_response: jsPsych.timelineVariable('correct_key')
+      },
+      on_finish: function(data){
+        data.correct = jsPsych.pluginAPI.compareKeys(data.response, data.correct_response);
+      }
+    };
+
+    // 5. Define Stimuli and link to Trial Structure
+    const trial_procedure = {
+      // Added fixation_trial to the beginning of the timeline sequence
+      timeline: [fixation_trial, mask_trial, prime_trial, target_trial],
+      timeline_variables: [
+        { prime: 'doctor', target: 'NURSE', correct_key: 'f' },
+        { prime: 'apple', target: 'FLIRB', correct_key: 'j' },
+        { prime: 'bread', target: 'BUTTER', correct_key: 'f' },
+        { prime: 'water', target: 'CHALK', correct_key: 'f' },
+        { prime: 'cloud', target: 'MOKIR', correct_key: 'j' }
+      ],
+      randomize_order: true
+    };
+    timeline.push(trial_procedure);
+
+    // 6. Run the experiment
+    jsPsych.run(timeline);
+  </script>
+</html>
