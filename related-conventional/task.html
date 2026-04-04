@@ -7,6 +7,7 @@
     <script src="https://unpkg.com/@jspsych-contrib/plugin-pipe"></script>
     <link href="https://unpkg.com/jspsych@7.3.4/css/jspsych.css" rel="stylesheet" type="text/css" />
     <style>
+      /* Styling for the task text */
       .stimulus-text {
         font-size: 48px;
         font-family: Arial, sans-serif;
@@ -16,336 +17,350 @@
         font-family: monospace;
         letter-spacing: 5px;
       }
+      /* Persistent counter styling */
       #trial-counter-container {
         position: fixed;
         top: 20px;
         right: 20px;
-        font-size: 20px;
+        font-size: 18px;
         font-family: Arial, sans-serif;
-        color: #000; /* Black text */
-        z-index: 9999; /* Stay above everything */
-        background-color: rgba(255, 255, 255, 0.8); /* Slight white background to see over stimuli */
-        padding: 10px;
-        border-radius: 5px;
-        pointer-events: none; /* Let clicks pass through to the experiment */
+        color: #555;
+        z-index: 10000; /* Stays on top of everything */
+        background-color: rgba(255, 255, 255, 0.7);
+        padding: 8px;
+        border-radius: 4px;
+        pointer-events: none; /* Prevents the box from blocking clicks */
       }
-      .stimulus-text { font-size: 48px; font-family: Arial, sans-serif; }
-      .mask-text { font-size: 48px; font-family: monospace; letter-spacing: 5px; }
     </style>
   </head>
   <body>
-    <div id="trial-counter-container">Trials remaining: 191</div>
-    
-    const jsPsych = initJsPsych();
+    <div id="trial-counter-container"></div>
 
-    const subject_id = jsPsych.randomization.randomID(10);
-    const filename = `${subject_id}.csv`;
+    <script>
+      // 1. Initialize jsPsych
+      const jsPsych = initJsPsych();
 
-    let trial_count = 191; 
+      // 2. Setup Data Management
+      const subject_id = jsPsych.randomization.randomID(10);
+      const filename = `${subject_id}.csv`;
 
-    // Helper to update the counter text
-    function updateCounter() {
-      const counterEl = document.getElementById('trial-counter-container');
-      if (counterEl) {
-        counterEl.innerHTML = `Trials remaining: ${trial_count}`;
+      // 3. Trial Counter Variables
+      let trial_count = 191;
+
+      function updateCounter() {
+        const counterDiv = document.getElementById('trial-counter-container');
+        if (counterDiv) {
+          counterDiv.innerHTML = `Trials remaining: ${trial_count}`;
+        }
       }
-    }
 
-    const timeline = [];
+      const timeline = [];
 
-    const instructions = {
-      type: jsPsychHtmlKeyboardResponse,
-      stimulus: `
-        <h2>Welcome to the experiment!</h2>
-        <p>In this task, you will see a fixation cross (+), followed by flashes on the screen.</p>
-        <p>After the flashes, a target word will appear in <strong>UPPERCASE</strong> letters.</p>
-        <br>
-        <p>Press the <strong>'F'</strong> key if the target is a real <strong>WORD</strong>.</p>
-        <p>Press the <strong>'J'</strong> key if the target is a <strong>NON-WORD</strong>.</p>
-        <br>
-        <p>Press SPACE to begin.</p>
-      `,
-      on_start: function() {
-        updateCounter(); // Show counter immediately after instructions
+      // Welcome & Instructions
+      const instructions = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `
+          <h2>Welcome to the experiment!</h2>
+          <p>In this task, you will see a fixation cross (+), followed by flashes on the screen.</p>
+          <p>After the flashes, a target word will appear in <strong>UPPERCASE</strong> letters.</p>
+          <br>
+          <p>Press the <strong>'F'</strong> key if the target is a real <strong>WORD</strong>.</p>
+          <p>Press the <strong>'J'</strong> key if the target is a <strong>NON-WORD</strong>.</p>
+          <br>
+          <p>Press SPACE to begin.</p>
+        `,
+        on_finish: function() {
+          updateCounter(); // Show counter as soon as task starts
+        }
+      };
+      timeline.push(instructions);
+
+      // Helper for random number mask
+      function generateMask() {
+        let mask = "";
+        for (let i = 0; i < 8; i++) {
+          mask += Math.floor(Math.random() * 10); 
+        }
+        return `<div class="mask-text">${mask}</div>`;
       }
-    };
-    timeline.push(instructions);
 
-    function generateMask() {
-      let mask = "";
-      for (let i = 0; i < 8; i++) {
-        mask += Math.floor(Math.random() * 10); 
-      }
-      return `<div class="mask-text">${mask}</div>`;
-    }
-    
-    const fixation_trial = {
-      type: jsPsychHtmlKeyboardResponse,
-      stimulus: '<div class="stimulus-text">+</div>',
-      choices: "NO_KEYS",
-      trial_duration: 1000,
-      on_start: function() {
-        updateCounter(); // Ensure count is correct at start of every trial loop
-      }
-    };
+      // --- Trial Components ---
 
-    const mask_trial = {
-      type: jsPsychHtmlKeyboardResponse,
-      stimulus: generateMask, 
-      choices: "NO_KEYS",      
-      trial_duration: 500
-      // Counter remains visible because it is a fixed HTML element
-    };
+      const fixation_trial = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: '<div class="stimulus-text">+</div>',
+        choices: "NO_KEYS",
+        trial_duration: 1000,
+        on_start: function() {
+          updateCounter(); // Refresh counter visibility
+        }
+      };
 
-    const prime_trial = {
-      type: jsPsychHtmlKeyboardResponse,
-      stimulus: function() {
-        return `<div class="stimulus-text">${jsPsych.timelineVariable('prime')}</div>`;
-      },
-      choices: "NO_KEYS",
-      trial_duration: 55
-    };
+      const mask_trial = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: generateMask, 
+        choices: "NO_KEYS",      
+        trial_duration: 500
+      };
 
-    const target_trial = {
-      type: jsPsychHtmlKeyboardResponse,
-      stimulus: function() {
-        return `<div class="stimulus-text"><strong>${jsPsych.timelineVariable('target')}</strong></div>`;
-      },
-      choices: ['f', 'j'],
-      trial_duration: 3000, 
-      post_trial_gap: 1000,
-      data: {
-        task: 'response',
-        correct_response: jsPsych.timelineVariable('correct_key'),
-        word_prime: jsPsych.timelineVariable('word_prime')
-      },
-      on_finish: function(data){
-        data.correct = jsPsych.pluginAPI.compareKeys(data.response, data.correct_response);
-        trial_count--; 
-        updateCounter(); // Update immediately so the new number shows during the 1000ms gap
-      }
-    };
+      const prime_trial = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function() {
+          return `<div class="stimulus-text">${jsPsych.timelineVariable('prime')}</div>`;
+        },
+        choices: "NO_KEYS",
+        trial_duration: 55
+      };
 
-    const trial_procedure = {
-      timeline: [fixation_trial, mask_trial, prime_trial, target_trial],
-      timeline_variables: [
-        { prime: 'baonmrla', target: 'ABNORMAL', correct_key: 'f', word_prime: true },
-        { prime: 'hsroateg', target: 'SHORTAGE', correct_key: 'f', word_prime: true },
-        { prime: 'riiraget', target: 'IRRIGATE', correct_key: 'f', word_prime: true },
-        { prime: 'cadameai', target: 'ACADEMIA', correct_key: 'f', word_prime: true },
-        { prime: 'ofnuatni', target: 'FOUNTAIN', correct_key: 'f', word_prime: true },
-        { prime: 'cauotsci', target: 'ACOUSTIC', correct_key: 'f', word_prime: true },
-        { prime: 'iltsnere', target: 'LISTENER', correct_key: 'f', word_prime: true },
-        { prime: 'velaauet', target: 'EVALUATE', correct_key: 'f', word_prime: true },
-        { prime: 'ejporayd', target: 'JEOPARDY', correct_key: 'f', word_prime: true },
-        { prime: 'avacitno', target: 'VACATION', correct_key: 'f', word_prime: true },
-        { prime: 'abknurtp', target: 'BANKRUPT', correct_key: 'f', word_prime: true },
-        { prime: 'acpmiang', target: 'CAMPAIGN', correct_key: 'f', word_prime: true },
-        { prime: 'ujenitno', target: 'JUNCTION', correct_key: 'f', word_prime: true },
-        { prime: 'rfsemhna', target: 'FRESHMAN', correct_key: 'f', word_prime: true },
-        { prime: 'acrraieg', target: 'CARRIAGE', correct_key: 'f', word_prime: true },
-        { prime: 'uhimilyt', target: 'HUMILITY', correct_key: 'f', word_prime: true },
-        { prime: 'rpporeyt', target: 'PROPERTY', correct_key: 'f', word_prime: true },
-        { prime: 'olacitno', target: 'LOCATION', correct_key: 'f', word_prime: true },
-        { prime: 'lecertno', target: 'ELECTRON', correct_key: 'f', word_prime: true },
-        { prime: 'ocmmreec', target: 'COMMERCE', correct_key: 'f', word_prime: true },
-        { prime: 'letoihgn', target: 'CLOTHING', correct_key: 'f', word_prime: true },
-        { prime: 'oratitno', target: 'ROTATION', correct_key: 'f', word_prime: true },
-        { prime: 'yhnpsosi', target: 'HYPNOSIS', correct_key: 'f', word_prime: true },
-        { prime: 'anivaget', target: 'NAVIGATE', correct_key: 'f', word_prime: true },
-        { prime: 'baurtpyl', target: 'ABRUPTLY', correct_key: 'f', word_prime: true },
-        { prime: 'atgnbiel', target: 'TANGIBLE', correct_key: 'f', word_prime: true },
-        { prime: 'nietvrla', target: 'INTERVAL', correct_key: 'f', word_prime: true },
-        { prime: 'abhclero', target: 'BACHELOR', correct_key: 'f', word_prime: true },
-        { prime: 'opssbiel', target: 'POSSIBLE', correct_key: 'f', word_prime: true },
-        { prime: 'psiltnre', target: 'SPLINTER', correct_key: 'f', word_prime: true },
-        { prime: 'rpaehcre', target: 'PREACHER', correct_key: 'f', word_prime: true },
-        { prime: 'emidatet', target: 'MEDITATE', correct_key: 'f', word_prime: true },
-        { prime: 'idtsirte', target: 'DISTRICT', correct_key: 'f', word_prime: true },
-        { prime: 'ydanimet', target: 'DYNAMITE', correct_key: 'f', word_prime: true },
-        { prime: 'niefirro', target: 'INFERIOR', correct_key: 'f', word_prime: true },
-        { prime: 'vecaauet', target: 'EVACUATE', correct_key: 'f', word_prime: true },
-        { prime: 'iacrartf', target: 'AIRCRAFT', correct_key: 'f', word_prime: true },
-        { prime: 'rtaeuser', target: 'TREASURE', correct_key: 'f', word_prime: true },
-        { prime: 'lfxebiel', target: 'FLEXIBLE', correct_key: 'f', word_prime: true },
-        { prime: 'edisngre', target: 'DESIGNER', correct_key: 'f', word_prime: true },
-        { prime: 'awtsfelu', target: 'WASTEFUL', correct_key: 'f', word_prime: true },
-        { prime: 'poopiset', target: 'OPPOSITE', correct_key: 'f', word_prime: true },
-        { prime: 'rfgaartn', target: 'FRAGRANT', correct_key: 'f', word_prime: true },
-        { prime: 'baosulet', target: 'ABSOLUTE', correct_key: 'f', word_prime: true },
-        { prime: 'efiminen', target: 'FEMININE', correct_key: 'f', word_prime: true },
-        { prime: 'pscaoisu', target: 'SPACIOUS', correct_key: 'f', word_prime: true },
-        { prime: 'ivogorsu', target: 'VIGOROUS', correct_key: 'f', word_prime: true },
-        { prime: 'octnarte', target: 'CONTRACT', correct_key: 'f', word_prime: true },
-        { prime: 'imtserss', target: 'MISTRESS', correct_key: 'f', word_prime: true },
-        { prime: 'neevolep', target: 'ENVELOPE', correct_key: 'f', word_prime: true },
-        { prime: 'erilbael', target: 'RELIABLE', correct_key: 'f', word_prime: true },
-        { prime: 'htoeolyg', target: 'THEOLOGY', correct_key: 'f', word_prime: true },
-        { prime: 'nievtnro', target: 'INVENTOR', correct_key: 'f', word_prime: true },
-        { prime: 'acapicyt', target: 'CAPACITY', correct_key: 'f', word_prime: true },
-        { prime: 'ocpmsore', target: 'COMPOSER', correct_key: 'f', word_prime: true },
-        { prime: 'awrrnayt', target: 'WARRANTY', correct_key: 'f', word_prime: true },
-        { prime: 'darobael', target: 'ADORABLE', correct_key: 'f', word_prime: true },
-        { prime: 'etrrbiel', target: 'TERRIBLE', correct_key: 'f', word_prime: true },
-        { prime: 'acintsre', target: 'CANISTER', correct_key: 'f', word_prime: true },
-        { prime: 'uaittsci', target: 'AUTISTIC', correct_key: 'f', word_prime: true },
-        { prime: 'ahdnmyna', target: 'HANDYMAN', correct_key: 'f', word_prime: true },
-        { prime: 'anitnola', target: 'NATIONAL', correct_key: 'f', word_prime: true },
-        { prime: 'cauqiatn', target: 'ACQUAINT', correct_key: 'f', word_prime: true },
-        { prime: 'caucaryc', target: 'ACCURACY', correct_key: 'f', word_prime: true },
-        { prime: 'xelpciti', target: 'EXPLICIT', correct_key: 'f', word_prime: true },
-        { prime: 'uqdaartn', target: 'QUADRANT', correct_key: 'f', word_prime: true },
-        { prime: 'imintsre', target: 'MINISTER', correct_key: 'f', word_prime: true },
-        { prime: 'batsartc', target: 'ABSTRACT', correct_key: 'f', word_prime: true },
-        { prime: 'ivllgare', target: 'VILLAGER', correct_key: 'f', word_prime: true },
-        { prime: 'adguthre', target: 'DAUGHTER', correct_key: 'f', word_prime: true },
-        { prime: 'poitimms', target: 'OPTIMISM', correct_key: 'f', word_prime: true },
-        { prime: 'awetmhna', target: 'WATCHMAN', correct_key: 'f', word_prime: true },
-        { prime: 'algnaueg', target: 'LANGUAGE', correct_key: 'f', word_prime: true },
-        { prime: 'ebevareg', target: 'BEVERAGE', correct_key: 'f', word_prime: true },
-        { prime: 'cadameci', target: 'ACADEMIC', correct_key: 'f', word_prime: true },
-        { prime: 'iwhtrdwa', target: 'WITHDRAW', correct_key: 'f', word_prime: true },
-        { prime: 'roginila', target: 'ORIGINAL', correct_key: 'f', word_prime: true },
-        { prime: 'rgcafelu', target: 'GRACEFUL', correct_key: 'f', word_prime: true },
-        { prime: 'asinatyr', target: 'SANITARY', correct_key: 'f', word_prime: true },
-        { prime: 'apitneec', target: 'PATIENCE', correct_key: 'f', word_prime: true },
-        { prime: 'rpcaitec', target: 'PRACTICE', correct_key: 'f', word_prime: true },
-        { prime: 'liulisno', target: 'ILLUSION', correct_key: 'f', word_prime: true },
-        { prime: 'ibtrdhya', target: 'BIRTHDAY', correct_key: 'f', word_prime: true },
-        { prime: 'ovelnaci', target: 'VOLCANIC', correct_key: 'f', word_prime: true },
-        { prime: 'awdnrere', target: 'WANDERER', correct_key: 'f', word_prime: true },
-        { prime: 'omnuatni', target: 'MOUNTAIN', correct_key: 'f', word_prime: true },
-        { prime: 'isedawkl', target: 'SIDEWALK', correct_key: 'f', word_prime: true },
-        { prime: 'aceldnra', target: 'CALENDAR', correct_key: 'f', word_prime: true },
-        { prime: 'saesbmel', target: 'ASSEMBLE', correct_key: 'f', word_prime: true },
-        { prime: 'opilitsc', target: 'POLITICS', correct_key: 'f', word_prime: true },
-        { prime: 'ovacilez', target: 'VOCALIZE', correct_key: 'f', word_prime: true },
-        { prime: 'ercaitno', target: 'REACTION', correct_key: 'f', word_prime: true },
-        { prime: 'daehisev', target: 'ADHESIVE', correct_key: 'f', word_prime: true },
-        { prime: 'afimilra', target: 'FAMILIAR', correct_key: 'f', word_prime: true },
-        { prime: 'osilidyf', target: 'SOLIDIFY', correct_key: 'f', word_prime: true },
-        { prime: 'dineityf', target: 'IDENTIFY', correct_key: 'f', word_prime: true },
-        { prime: 'ehenars!', target: 'HENERALS', correct_key: 'j', word_prime: false },
-        { prime: 'ohmmnaod', target: 'HOMMANDO', correct_key: 'j', word_prime: false },
-        { prime: 'anerewll', target: 'NAREWELL', correct_key: 'j', word_prime: false },
-        { prime: 'xelpdare', target: 'EXPLADER', correct_key: 'j', word_prime: false },
-        { prime: 'baebulai', target: 'ABBELUIA', correct_key: 'j', word_prime: false },
-        { prime: 'taetdnxi', target: 'ATTENDIX', correct_key: 'j', word_prime: false },
-        { prime: 'raaksngi', target: 'ARKANSIG', correct_key: 'j', word_prime: false },
-        { prime: 'abfrilem', target: 'BARFLIME', correct_key: 'j', word_prime: false },
-        { prime: 'abtrelhc', target: 'BARTLECH', correct_key: 'j', word_prime: false },
-        { prime: 'odnuitna', target: 'DOUNTIAN', correct_key: 'j', word_prime: false },
-        { prime: 'maomatet', target: 'AMMOTATE', correct_key: 'j', word_prime: false },
-        { prime: 'rtooimyl', target: 'TROOMILY', correct_key: 'j', word_prime: false },
-        { prime: 'rbaowdbi', target: 'BROADWIB', correct_key: 'j', word_prime: false },
-        { prime: 'rdiaamtn', target: 'DRAIMANT', correct_key: 'j', word_prime: false },
-        { prime: 'rbwoonms', target: 'BROWNOSM', correct_key: 'j', word_prime: false },
-        { prime: 'cspaihet', target: 'SCAPHITE', correct_key: 'j', word_prime: false },
-        { prime: 'ubhenafu', target: 'BUCHANUF', correct_key: 'j', word_prime: false },
-        { prime: 'ubadupgs', target: 'BUDAPUSG', correct_key: 'j', word_prime: false },
-        { prime: 'ebufbbel', target: 'BEFUBBLE', correct_key: 'j', word_prime: false },
-        { prime: 'daadhese', target: 'ADDACHES', correct_key: 'j', word_prime: false },
-        { prime: 'faeferhe', target: 'AFFERECH', correct_key: 'j', word_prime: false },
-        { prime: 'emicnayc', target: 'MECIANCY', correct_key: 'j', word_prime: false },
-        { prime: 'saotacet', target: 'ASTOCATE', correct_key: 'j', word_prime: false },
-        { prime: 'daodagtn', target: 'ADDOGANT', correct_key: 'j', word_prime: false },
-        { prime: 'ubsrtinu', target: 'BURSITUN', correct_key: 'j', word_prime: false },
-        { prime: 'marmaohe', target: 'AMMROACH', correct_key: 'j', word_prime: false },
-        { prime: 'hsgaartn', target: 'SHAGRANT', correct_key: 'j', word_prime: false },
-        { prime: 'ebeviled', target: 'BEVELIDE', correct_key: 'j', word_prime: false },
-        { prime: 'pauparet', target: 'APPURATE', correct_key: 'j', word_prime: false },
-        { prime: 'ogpmlise', target: 'GOMPILES', correct_key: 'j', word_prime: false },
-        { prime: 'dardvose', target: 'ADDROVES', correct_key: 'j', word_prime: false },
-        { prime: 'balbiasm', target: 'ABBLAIMS', correct_key: 'j', word_prime: false },
-        { prime: 'raerogyr', target: 'ARREGORY', correct_key: 'j', word_prime: false },
-        { prime: 'gaegwyya', target: 'AGGEYWAY', correct_key: 'j', word_prime: false },
-        { prime: 'taetgrne', target: 'ATTERGEN', correct_key: 'j', word_prime: false },
-        { prime: 'masuteys', target: 'AMUSETSY', correct_key: 'j', word_prime: false },
-        { prime: 'rdnaekst', target: 'DRANKETS', correct_key: 'j', word_prime: false },
-        { prime: 'raaiinep', target: 'ARIANIPE', correct_key: 'j', word_prime: false },
-        { prime: 'htsoasyr', target: 'THOSSARY', correct_key: 'j', word_prime: false },
-        { prime: 'rgnaskpe', target: 'GRANKSEP', correct_key: 'j', word_prime: false },
-        { prime: 'naanertn', target: 'ANNARENT', correct_key: 'j', word_prime: false },
-        { prime: 'hsnalura', target: 'SHANULAR', correct_key: 'j', word_prime: false },
-        { prime: 'rtnaedsr', target: 'TRANDERS', correct_key: 'j', word_prime: false },
-        { prime: 'acolewsr', target: 'CALOWERS', correct_key: 'j', word_prime: false },
-        { prime: 'baubtsmo', target: 'ABBUSTOM', correct_key: 'j', word_prime: false },
-        { prime: 'raaianks', target: 'ARIANASK', correct_key: 'j', word_prime: false },
-        { prime: 'paoharts', target: 'APHORAST', correct_key: 'j', word_prime: false },
-        { prime: 'daodaled', target: 'ADDOLADE', correct_key: 'j', word_prime: false },
-        { prime: 'pscaoktu', target: 'SPACKOUT', correct_key: 'j', word_prime: false },
-        { prime: 'tautisev', target: 'ATTUSIVE', correct_key: 'j', word_prime: false },
-        { prime: 'rdsaisse', target: 'DRASSICS', correct_key: 'j', word_prime: false },
-        { prime: 'raeminto', target: 'ARMENIOT', correct_key: 'j', word_prime: false },
-        { prime: 'taetssro', target: 'ATTESSOR', correct_key: 'j', word_prime: false },
-        { prime: 'gaigavsl', target: 'AGGIVALS', correct_key: 'j', word_prime: false },
-        { prime: 'heruitms.', target: 'CHURTISM', correct_key: 'j', word_prime: false },
-        { prime: 'lailitev', target: 'ALLITIVE', correct_key: 'j', word_prime: false },
-        { prime: 'gauglayl', target: 'AGGUALLY', correct_key: 'j', word_prime: false },
-        { prime: 'onmrsats', target: 'NORMASST', correct_key: 'j', word_prime: false },
-        { prime: 'paapkere', target: 'APPACKER', correct_key: 'j', word_prime: false },
-        { prime: 'psdaeitn', target: 'SPADIENT', correct_key: 'j', word_prime: false },
-        { prime: 'daidinyt', target: 'ADDINITY', correct_key: 'j', word_prime: false },
-        { prime: 'naenbmel', target: 'ANNEMBLE', correct_key: 'j', word_prime: false },
-        { prime: 'baubisno', target: 'ABBUSION', correct_key: 'j', word_prime: false },
-        { prime: 'farfeiev', target: 'AFFRIEVE', correct_key: 'j', word_prime: false },
-        { prime: 'agsuispo', target: 'GAUSSIOP', correct_key: 'j', word_prime: false },
-        { prime: 'rpteehnr', target: 'PRETHERN', correct_key: 'j', word_prime: false },
-        { prime: 'paopnrye', target: 'APPORNEY', correct_key: 'j', word_prime: false },
-        { prime: 'lpeefrlu', target: 'PLEERFUL', correct_key: 'j', word_prime: false },
-        { prime: 'lssemhne', target: 'SLESHMEN', correct_key: 'j', word_prime: false },
-        { prime: 'gargiaes', target: 'AGGRAISE', correct_key: 'j', word_prime: false },
-        { prime: 'oftreitp', target: 'FORTIEPT', correct_key: 'j', word_prime: false },
-        { prime: 'gaaglust', target: 'AGGAULTS', correct_key: 'j', word_prime: false },
-        { prime: 'onwgehll', target: 'NOGWHELL', correct_key: 'j', word_prime: false },
-        { prime: 'olroamli', target: 'LOORMAIL', correct_key: 'j', word_prime: false },
-        { prime: 'acnrfeei', target: 'CARNEFIE', correct_key: 'j', word_prime: false },
-        { prime: 'laajectn', target: 'ALJACENT', correct_key: 'j', word_prime: false },
-        { prime: 'recookyr', target: 'CROCKORY', correct_key: 'j', word_prime: false },
-        { prime: 'edastrre', target: 'DESARTER', correct_key: 'j', word_prime: false },
-        { prime: 'ifgaarsm', target: 'FIAGRAMS', correct_key: 'j', word_prime: false },
-        { prime: 'rbsaltse', target: 'BRASTLES', correct_key: 'j', word_prime: false },
-        { prime: 'gaurtpyl', target: 'AGRUPTLY', correct_key: 'j', word_prime: false },
-        { prime: 'lftaehka', target: 'FLATHEAK', correct_key: 'j', word_prime: false },
-        { prime: 'iddsias!', target: 'DISDAILS', correct_key: 'j', word_prime: false },
-        { prime: 'ogmrlusa', target: 'GORMULAS', correct_key: 'j', word_prime: false },
-        { prime: 'ocagtnyl', target: 'COGANTLY', correct_key: 'j', word_prime: false },
-        { prime: 'rbtihcsu', target: 'BRITCHUS', correct_key: 'j', word_prime: false },
-        { prime: 'uaopreta', target: 'AUPOCRAT', correct_key: 'j', word_prime: false },
-        { prime: 'ontoohdl', target: 'NOOTHOLD', correct_key: 'j', word_prime: false },
-        { prime: 'apatilms', target: 'PATALISM', correct_key: 'j', word_prime: false },
-        { prime: 'aberssse', target: 'BARESSES', correct_key: 'j', word_prime: false },
-        { prime: 'iphsacek', target: 'PISHCAKE', correct_key: 'j', word_prime: false },
-        { prime: 'xemelpta', target: 'EXEMPLAT', correct_key: 'j', word_prime: false },
-        { prime: 'ueeginsf', target: 'EUGENIFS', correct_key: 'j', word_prime: false },
-        { prime: 'teihicks', target: 'ETHICISK', correct_key: 'j', word_prime: false },
-        { prime: 'esrgdueg', target: 'SEGRUDGE', correct_key: 'j', word_prime: false },
-        { prime: 'idgnedgn', target: 'DINGDENG', correct_key: 'j', word_prime: false },
-      ],
-      randomize_order: true
-    };
-    timeline.push(trial_procedure);
+      const target_trial = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: function() {
+          return `<div class="stimulus-text"><strong>${jsPsych.timelineVariable('target')}</strong></div>`;
+        },
+        choices: ['f', 'j'],
+        trial_duration: 3000, 
+        post_trial_gap: 1000,
+        data: {
+          task: 'response',
+          correct_response: jsPsych.timelineVariable('correct_key'),
+          word_prime: jsPsych.timelineVariable('word_prime')
+        },
+        on_finish: function(data){
+          data.correct = jsPsych.pluginAPI.compareKeys(data.response, data.correct_response);
+          // Decrement and update the counter visible on screen
+          trial_count--;
+          updateCounter();
+        }
+      };
 
-    const save_data = {
-      type: jsPsychPipe,
-      action: "save",
-      experiment_id: "EdgPVNgZq20s", 
-      filename: filename,
-      data_string: () => jsPsych.data.get().csv()
-    };
+      // 4. Define All 191 Stimuli
+      const trial_procedure = {
+        timeline: [fixation_trial, mask_trial, prime_trial, target_trial],
+        timeline_variables: [
+          { prime: 'tonsular', target: 'ABNORMAL', correct_key: 'f', word_prime: true },
+          { prime: 'honsumer', target: 'SHORTAGE', correct_key: 'f', word_prime: true },
+          { prime: 'barnyerd', target: 'IRRIGATE', correct_key: 'f', word_prime: true },
+          { prime: 'comferts', target: 'ACADEMIA', correct_key: 'f', word_prime: true },
+          { prime: 'casanoma', target: 'FOUNTAIN', correct_key: 'f', word_prime: true },
+          { prime: 'elormity', target: 'ACOUSTIC', correct_key: 'f', word_prime: true },
+          { prime: 'fleaworb', target: 'LISTENER', correct_key: 'f', word_prime: true },
+          { prime: 'pastrate', target: 'EVALUATE', correct_key: 'f', word_prime: true },
+          { prime: 'pladness', target: 'JEOPARDY', correct_key: 'f', word_prime: true },
+          { prime: 'etorcism', target: 'VACATION', correct_key: 'f', word_prime: true },
+          { prime: 'drambles', target: 'BANKRUPT', correct_key: 'f', word_prime: true },
+          { prime: 'havities', target: 'CAMPAIGN', correct_key: 'f', word_prime: true },
+          { prime: 'therkins', target: 'JUNCTION', correct_key: 'f', word_prime: true },
+          { prime: 'enhancos', target: 'FRESHMAN', correct_key: 'f', word_prime: true },
+          { prime: 'drescent', target: 'CARRIAGE', correct_key: 'f', word_prime: true },
+          { prime: 'miocesan', target: 'HUMILITY', correct_key: 'f', word_prime: true },
+          { prime: 'sordeaux', target: 'PROPERTY', correct_key: 'f', word_prime: true },
+          { prime: 'tarnival', target: 'LOCATION', correct_key: 'f', word_prime: true },
+          { prime: 'heftness', target: 'ELECTRON', correct_key: 'f', word_prime: true },
+          { prime: 'bruitful', target: 'COMMERCE', correct_key: 'f', word_prime: true },
+          { prime: 'fomeback', target: 'CLOTHING', correct_key: 'f', word_prime: true },
+          { prime: 'sonfines', target: 'ROTATION', correct_key: 'f', word_prime: true },
+          { prime: 'airdrobs', target: 'HYPNOSIS', correct_key: 'f', word_prime: true },
+          { prime: 'draftars', target: 'NAVIGATE', correct_key: 'f', word_prime: true },
+          { prime: 'apethyst', target: 'ABRUPTLY', correct_key: 'f', word_prime: true },
+          { prime: 'dustomer', target: 'TANGIBLE', correct_key: 'f', word_prime: true },
+          { prime: 'rotanist', target: 'INTERVAL', correct_key: 'f', word_prime: true },
+          { prime: 'blippant', target: 'BACHELOR', correct_key: 'f', word_prime: true },
+          { prime: 'alterial', target: 'POSSIBLE', correct_key: 'f', word_prime: true },
+          { prime: 'foremaws', target: 'SPLINTER', correct_key: 'f', word_prime: true },
+          { prime: 'elpousal', target: 'PREACHER', correct_key: 'f', word_prime: true },
+          { prime: 'aptivist', target: 'MEDITATE', correct_key: 'f', word_prime: true },
+          { prime: 'dialyzod', target: 'DISTRICT', correct_key: 'f', word_prime: true },
+          { prime: 'cholerac', target: 'DYNAMITE', correct_key: 'f', word_prime: true },
+          { prime: 'baptosts', target: 'INFERIOR', correct_key: 'f', word_prime: true },
+          { prime: 'fourepes', target: 'EVACUATE', correct_key: 'f', word_prime: true },
+          { prime: 'fesserts', target: 'AIRCRAFT', correct_key: 'f', word_prime: true },
+          { prime: 'dislokes', target: 'TREASURE', correct_key: 'f', word_prime: true },
+          { prime: 'campmane', target: 'FLEXIBLE', correct_key: 'f', word_prime: true },
+          { prime: 'confrent', target: 'DESIGNER', correct_key: 'f', word_prime: true },
+          { prime: 'farments', target: 'WASTEFUL', correct_key: 'f', word_prime: true },
+          { prime: 'garousel', target: 'OPPOSITE', correct_key: 'f', word_prime: true },
+          { prime: 'ahortion', target: 'FRAGRANT', correct_key: 'f', word_prime: true },
+          { prime: 'flagbole', target: 'ABSOLUTE', correct_key: 'f', word_prime: true },
+          { prime: 'cervicad', target: 'FEMININE', correct_key: 'f', word_prime: true },
+          { prime: 'epissary', target: 'SPACIOUS', correct_key: 'f', word_prime: true },
+          { prime: 'grakeman', target: 'VIGOROUS', correct_key: 'f', word_prime: true },
+          { prime: 'thapters', target: 'CONTRACT', correct_key: 'f', word_prime: true },
+          { prime: 'ethibits', target: 'MISTRESS', correct_key: 'f', word_prime: true },
+          { prime: 'luttings', target: 'ENVELOPE', correct_key: 'f', word_prime: true },
+          { prime: 'clumsily', target: 'RELIABLE', correct_key: 'f', word_prime: true },
+          { prime: 'clowback', target: 'THEOLOGY', correct_key: 'f', word_prime: true },
+          { prime: 'esgapist', target: 'INVENTOR', correct_key: 'f', word_prime: true },
+          { prime: 'deasible', target: 'CAPACITY', correct_key: 'f', word_prime: true },
+          { prime: 'attiques', target: 'COMPOSER', correct_key: 'f', word_prime: true },
+          { prime: 'hamisole', target: 'WARRANTY', correct_key: 'f', word_prime: true },
+          { prime: 'poatherd', target: 'ADORABLE', correct_key: 'f', word_prime: true },
+          { prime: 'abaconda', target: 'TERRIBLE', correct_key: 'f', word_prime: true },
+          { prime: 'elcumber', target: 'CANISTER', correct_key: 'f', word_prime: true },
+          { prime: 'honcerto', target: 'AUTISTIC', correct_key: 'f', word_prime: true },
+          { prime: 'pautions', target: 'HANDYMAN', correct_key: 'f', word_prime: true },
+          { prime: 'confatti', target: 'NATIONAL', correct_key: 'f', word_prime: true },
+          { prime: 'trightly', target: 'ACQUAINT', correct_key: 'f', word_prime: true },
+          { prime: 'crowbaut', target: 'ACCURACY', correct_key: 'f', word_prime: true },
+          { prime: 'anderseb', target: 'EXPLICIT', correct_key: 'f', word_prime: true },
+          { prime: 'gynamics', target: 'QUADRANT', correct_key: 'f', word_prime: true },
+          { prime: 'erulsify', target: 'MINISTER', correct_key: 'f', word_prime: true },
+          { prime: 'efcesses', target: 'ABSTRACT', correct_key: 'f', word_prime: true },
+          { prime: 'beardowg', target: 'VILLAGER', correct_key: 'f', word_prime: true },
+          { prime: 'mapsules', target: 'DAUGHTER', correct_key: 'f', word_prime: true },
+          { prime: 'glinches', target: 'OPTIMISM', correct_key: 'f', word_prime: true },
+          { prime: 'dovernor', target: 'WATCHMAN', correct_key: 'f', word_prime: true },
+          { prime: 'anorable', target: 'LANGUAGE', correct_key: 'f', word_prime: true },
+          { prime: 'clipters', target: 'BEVERAGE', correct_key: 'f', word_prime: true },
+          { prime: 'gupboard', target: 'ACADEMIC', correct_key: 'f', word_prime: true },
+          { prime: 'fraduate', target: 'WITHDRAW', correct_key: 'f', word_prime: true },
+          { prime: 'drafteng', target: 'ORIGINAL', correct_key: 'f', word_prime: true },
+          { prime: 'pontrast', target: 'GRACEFUL', correct_key: 'f', word_prime: true },
+          { prime: 'gommerce', target: 'SANITARY', correct_key: 'f', word_prime: true },
+          { prime: 'calabush', target: 'PATIENCE', correct_key: 'f', word_prime: true },
+          { prime: 'taiquiri', target: 'PRACTICE', correct_key: 'f', word_prime: true },
+          { prime: 'ploseout', target: 'ILLUSION', correct_key: 'f', word_prime: true },
+          { prime: 'loctoral', target: 'BIRTHDAY', correct_key: 'f', word_prime: true },
+          { prime: 'dobertan', target: 'VOLCANIC', correct_key: 'f', word_prime: true },
+          { prime: 'pidelity', target: 'WANDERER', correct_key: 'f', word_prime: true },
+          { prime: 'canodize', target: 'MOUNTAIN', correct_key: 'f', word_prime: true },
+          { prime: 'pylinder', target: 'SIDEWALK', correct_key: 'f', word_prime: true },
+          { prime: 'branthes', target: 'CALENDAR', correct_key: 'f', word_prime: true },
+          { prime: 'frayfish', target: 'ASSEMBLE', correct_key: 'f', word_prime: true },
+          { prime: 'tocility', target: 'POLITICS', correct_key: 'f', word_prime: true },
+          { prime: 'pairness', target: 'VOCALIZE', correct_key: 'f', word_prime: true },
+          { prime: 'emfeeble', target: 'REACTION', correct_key: 'f', word_prime: true },
+          { prime: 'gertride', target: 'ADHESIVE', correct_key: 'f', word_prime: true },
+          { prime: 'guckshot', target: 'FAMILIAR', correct_key: 'f', word_prime: true },
+          { prime: 'elenenth', target: 'SOLIDIFY', correct_key: 'f', word_prime: true },
+          { prime: 'pandages', target: 'IDENTIFY', correct_key: 'f', word_prime: true },
+          { prime: 'cataligs', target: 'HENERALS', correct_key: 'j', word_prime: false },
+          { prime: 'preakage', target: 'HOMMANDO', correct_key: 'j', word_prime: false },
+          { prime: 'anatomip', target: 'NAREWELL', correct_key: 'j', word_prime: false },
+          { prime: 'phloride', target: 'EXPLADER', correct_key: 'j', word_prime: false },
+          { prime: 'agrocity', target: 'ABBELUIA', correct_key: 'j', word_prime: false },
+          { prime: 'averrant', target: 'ATTENDIX', correct_key: 'j', word_prime: false },
+          { prime: 'mossamer', target: 'ARKANSIG', correct_key: 'j', word_prime: false },
+          { prime: 'tascists', target: 'BARFLIME', correct_key: 'j', word_prime: false },
+          { prime: 'tritical', target: 'BARTLECH', correct_key: 'j', word_prime: false },
+          { prime: 'slutches', target: 'DOUNTIAN', correct_key: 'j', word_prime: false },
+          { prime: 'larnacle', target: 'AMMOTATE', correct_key: 'j', word_prime: false },
+          { prime: 'hatholic', target: 'TROOMILY', correct_key: 'j', word_prime: false },
+          { prime: 'plounder', target: 'BROADWIB', correct_key: 'j', word_prime: false },
+          { prime: 'poubloon', target: 'DRAIMANT', correct_key: 'j', word_prime: false },
+          { prime: 'kyelical', target: 'BROWNOSM', correct_key: 'j', word_prime: false },
+          { prime: 'nootnote', target: 'SCAPHITE', correct_key: 'j', word_prime: false },
+          { prime: 'poalesce', target: 'BUCHANUF', correct_key: 'j', word_prime: false },
+          { prime: 'elcircle', target: 'BUDAPUSG', correct_key: 'j', word_prime: false },
+          { prime: 'exorfist', target: 'BEFUBBLE', correct_key: 'j', word_prime: false },
+          { prime: 'noldfish', target: 'ADDACHES', correct_key: 'j', word_prime: false },
+          { prime: 'sinomial', target: 'AFFERECH', correct_key: 'j', word_prime: false },
+          { prime: 'easenent', target: 'MECIANCY', correct_key: 'j', word_prime: false },
+          { prime: 'epigrach', target: 'ASTOCATE', correct_key: 'j', word_prime: false },
+          { prime: 'conniter', target: 'ADDOGANT', correct_key: 'j', word_prime: false },
+          { prime: 'eannings', target: 'BURSITUN', correct_key: 'j', word_prime: false },
+          { prime: 'bullrint', target: 'AMMROACH', correct_key: 'j', word_prime: false },
+          { prime: 'explacit', target: 'SHAGRANT', correct_key: 'j', word_prime: false },
+          { prime: 'forwargs', target: 'BEVELIDE', correct_key: 'j', word_prime: false },
+          { prime: 'fruision', target: 'APPURATE', correct_key: 'j', word_prime: false },
+          { prime: 'hettings', target: 'GOMPILES', correct_key: 'j', word_prime: false },
+          { prime: 'slincher', target: 'ADDROVES', correct_key: 'j', word_prime: false },
+          { prime: 'giabetic', target: 'ABBLAIMS', correct_key: 'j', word_prime: false },
+          { prime: 'biscover', target: 'ARREGORY', correct_key: 'j', word_prime: false },
+          { prime: 'tranules', target: 'AGGEYWAY', correct_key: 'j', word_prime: false },
+          { prime: 'gasebook', target: 'ATTERGEN', correct_key: 'j', word_prime: false },
+          { prime: 'aiplines', target: 'AMUSETSY', correct_key: 'j', word_prime: false },
+          { prime: 'cootsore', target: 'DRANKETS', correct_key: 'j', word_prime: false },
+          { prime: 'envisape', target: 'ARIANIPE', correct_key: 'j', word_prime: false },
+          { prime: 'kraftees', target: 'THOSSARY', correct_key: 'j', word_prime: false },
+          { prime: 'ainborne', target: 'GRANKSEP', correct_key: 'j', word_prime: false },
+          { prime: 'auracity', target: 'ANNARENT', correct_key: 'j', word_prime: false },
+          { prime: 'sidactic', target: 'SHANULAR', correct_key: 'j', word_prime: false },
+          { prime: 'caboofle', target: 'TRANDERS', correct_key: 'j', word_prime: false },
+          { prime: 'dellular', target: 'CALOWERS', correct_key: 'j', word_prime: false },
+          { prime: 'argumelt', target: 'ABBUSTOM', correct_key: 'j', word_prime: false },
+          { prime: 'amateuls', target: 'ARIANASK', correct_key: 'j', word_prime: false },
+          { prime: 'epeglass', target: 'APHORAST', correct_key: 'j', word_prime: false },
+          { prime: 'slatfoot', target: 'ADDOLADE', correct_key: 'j', word_prime: false },
+          { prime: 'fartoons', target: 'SPACKOUT', correct_key: 'j', word_prime: false },
+          { prime: 'elpedite', target: 'ATTUSIVE', correct_key: 'j', word_prime: false },
+          { prime: 'franklon', target: 'DRASSICS', correct_key: 'j', word_prime: false },
+          { prime: 'rabinets', target: 'ARMENIOT', correct_key: 'j', word_prime: false },
+          { prime: 'althouch', target: 'ATTESSOR', correct_key: 'j', word_prime: false },
+          { prime: 'galaxoes', target: 'AGGIVALS', correct_key: 'j', word_prime: false },
+          { prime: 'choctows', target: 'CHURTISM', correct_key: 'j', word_prime: false },
+          { prime: 'ascrives', target: 'ALLITIVE', correct_key: 'j', word_prime: false },
+          { prime: 'phoirboy', target: 'AGGUALLY', correct_key: 'j', word_prime: false },
+          { prime: 'blowfash', target: 'NORMASST', correct_key: 'j', word_prime: false },
+          { prime: 'delerity', target: 'APPACKER', correct_key: 'j', word_prime: false },
+          { prime: 'communos', target: 'SPADIENT', correct_key: 'j', word_prime: false },
+          { prime: 'daffodol', target: 'ADDINITY', correct_key: 'j', word_prime: false },
+          { prime: 'seginner', target: 'ANNEMBLE', correct_key: 'j', word_prime: false },
+          { prime: 'hollages', target: 'ABBUSION', correct_key: 'j', word_prime: false },
+          { prime: 'lactions', target: 'AFFRIEVE', correct_key: 'j', word_prime: false },
+          { prime: 'edertion', target: 'GAUSSIOP', correct_key: 'j', word_prime: false },
+          { prime: 'fontract', target: 'PRETHERN', correct_key: 'j', word_prime: false },
+          { prime: 'antedape', target: 'APPORNEY', correct_key: 'j', word_prime: false },
+          { prime: 'abywhere', target: 'PLEERFUL', correct_key: 'j', word_prime: false },
+          { prime: 'lathroom', target: 'SLESHMEN', correct_key: 'j', word_prime: false },
+          { prime: 'disfavob', target: 'AGGRAISE', correct_key: 'j', word_prime: false },
+          { prime: 'apopleky', target: 'FORTIEPT', correct_key: 'j', word_prime: false },
+          { prime: 'curtnass', target: 'AGGAULTS', correct_key: 'j', word_prime: false },
+          { prime: 'abandant', target: 'NOGWHELL', correct_key: 'j', word_prime: false },
+          { prime: 'enforcas', target: 'LOORMAIL', correct_key: 'j', word_prime: false },
+          { prime: 'apheists', target: 'CARNEFIE', correct_key: 'j', word_prime: false },
+          { prime: 'defereft', target: 'ALJACENT', correct_key: 'j', word_prime: false },
+          { prime: 'nockpits', target: 'CROCKORY', correct_key: 'j', word_prime: false },
+          { prime: 'accestor', target: 'DESARTER', correct_key: 'j', word_prime: false },
+          { prime: 'guoyancy', target: 'FIAGRAMS', correct_key: 'j', word_prime: false },
+          { prime: 'biweesly', target: 'BRASTLES', correct_key: 'j', word_prime: false },
+          { prime: 'dronchus', target: 'AGRUPTLY', correct_key: 'j', word_prime: false },
+          { prime: 'cirearms', target: 'FLATHEAK', correct_key: 'j', word_prime: false },
+          { prime: 'emassion', target: 'DISDAILS', correct_key: 'j', word_prime: false },
+          { prime: 'pivision', target: 'GORMULAS', correct_key: 'j', word_prime: false },
+          { prime: 'linishes', target: 'COGANTLY', correct_key: 'j', word_prime: false },
+          { prime: 'desalate', target: 'BRITCHUS', correct_key: 'j', word_prime: false },
+          { prime: 'soalhole', target: 'AUPOCRAT', correct_key: 'j', word_prime: false },
+          { prime: 'ebbitter', target: 'NOOTHOLD', correct_key: 'j', word_prime: false },
+          { prime: 'applauso', target: 'PATALISM', correct_key: 'j', word_prime: false },
+          { prime: 'vaylight', target: 'BARESSES', correct_key: 'j', word_prime: false },
+          { prime: 'fluidily', target: 'PISHCAKE', correct_key: 'j', word_prime: false },
+          { prime: 'lormulae', target: 'EXEMPLAT', correct_key: 'j', word_prime: false },
+          { prime: 'panknote', target: 'EUGENIFS', correct_key: 'j', word_prime: false },
+          { prime: 'nastards', target: 'ETHICISK', correct_key: 'j', word_prime: false },
+          { prime: 'hiplomat', target: 'SEGRUDGE', correct_key: 'j', word_prime: false },
+          { prime: 'danquets', target: 'DINGDENG', correct_key: 'j', word_prime: false }
+        ],
+        randomize_order: true
+      };
+      timeline.push(trial_procedure);
 
-    timeline.push(save_data);
+      // DataPipe Save Trial
+      const save_data = {
+        type: jsPsychPipe,
+        action: "save",
+        experiment_id: "GMb9Jx86cCbD", 
+        filename: filename,
+        data_string: () => jsPsych.data.get().csv(),
+        on_start: function() {
+          // Hide counter when experiment ends
+          document.getElementById('trial-counter-container').style.display = 'none';
+        }
+      };
+      timeline.push(save_data);
 
-    const debrief = {
-      type: jsPsychHtmlKeyboardResponse,
-      stimulus: `
-        <p>Data saved successfully!</p>
-        <p>Participant ID: ${subject_id}</p>
-        <p>You can close the tab ^^</p>
-      `
-    };
-    timeline.push(debrief);
+      // Final message
+      const debrief = {
+        type: jsPsychHtmlKeyboardResponse,
+        stimulus: `
+          <p>Data saved successfully!</p>
+          <p>Participant ID: ${subject_id}</p>
+          <p>You can close the tab ^^</p>
+        `
+      };
+      timeline.push(debrief);
 
-    jsPsych.run(timeline);
-  </script>
+      // Run
+      jsPsych.run(timeline);
+    </script>
+  </body>
 </html>
