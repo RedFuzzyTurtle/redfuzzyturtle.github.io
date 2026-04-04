@@ -52,7 +52,7 @@
         <br>
         <p>Press SPACE to begin.</p>
       `,
-      on_finish: function() {
+      on_start: function() {
         updateCounter(); // Show counter immediately after instructions
       }
     };
@@ -70,10 +70,7 @@
       type: jsPsychHtmlKeyboardResponse,
       stimulus: '<div class="stimulus-text">+</div>',
       choices: "NO_KEYS",
-      trial_duration: 1000,
-      on_start: function() {
-        updateCounter(); // Ensure it reflects the current state at the start of the trial cycle
-      }
+      trial_duration: 1000
     };
 
     const mask_trial = {
